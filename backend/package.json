@@ -1,0 +1,29 @@
+{
+    "type": "module",
+    "scripts": {
+        "dev": "nodemon server.js",
+        "start": "node server.js"
+    },
+    "dependencies": {
+        "@t3-oss/env-core": "^0.13.8",
+        "dotenv": "^17.2.1",
+        "drizzle-kit": "^0.31.4",
+        "drizzle-orm": "^0.44.4",
+        "express": "^5.1.0",
+        "multer": "^2.0.2",
+        "pg": "^8.16.3",
+        "zod": "^4.0.14"
+    },
+    "name": "backend",
+    "version": "1.0.0",
+    "main": "env_var.js",
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "description": "",
+    "devDependencies": {
+        "@types/multer": "^2.0.0",
+        "@types/node": "^24.2.0",
+        "@types/pg": "^8.15.5"
+    }
+}

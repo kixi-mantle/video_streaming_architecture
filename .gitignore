@@ -1,0 +1,14 @@
+# Node.js
+**/node_modules/
+
+# Environment files
+**/.env
+**/.env*
+
+# Build directories
+**/dist/
+**/build/
+
+# Frontend specific (future proofing)
+**/.next/
+**/out/

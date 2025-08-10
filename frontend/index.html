@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Video Uploader</title>
+</head>
+<body>
+  <h1>Chunked Video Uploader</h1>
+
+  <input type="file" id="fileInput" />
+  <br/><br/>
+  <progress id="progressBar" value="0" max="100"></progress>
+  <br/><br/>
+  <button id="uploadBtn">Upload</button>
+
+  <script>
+    const fileInput = document.getElementById('fileInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const progressBar = document.getElementById('progressBar');
+
+    
+
+    uploadBtn.addEventListener('click', async () => {
+      const file = fileInput.files[0];
+      if (!file) return alert("Choose a file");
+
+      const chunkSize = 5 * 1024 * 1024; // 5MB
+      const totalChunks = Math.ceil(file.size / chunkSize);
+
+        console.log(file.name)
+        console.log(totalChunks)
+
+      // Step 1: Init
+      const initRes = await fetch('/upload/init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filename: file.name,
+          totalChunks
+        })
+      });
+      const { uploadId } = await initRes.json();
+
+      // Step 2: Upload chunks
+      for (let i = 0; i < totalChunks; i++) {
+        const chunk = file.slice(i * chunkSize, (i + 1) * chunkSize);
+
+        await fetch(`/upload/${uploadId}/${i}`, {
+          method: 'POST',
+          body: chunk
+        });
+
+        progressBar.value = Math.floor(((i + 1) / totalChunks) * 100);
+      }
+
+      // Step 3: Finalize
+      await fetch(`/upload/${uploadId}/finalize`, { method: 'POST' });
+        porgressBar.value = 0 
+        fileInput.files = []
+
+      alert('Upload complete!');
+    });
+  </script>
+</body>
+</html>
+
