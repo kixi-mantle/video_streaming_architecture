@@ -4,8 +4,8 @@ import fs   from "fs"
 import { eq, sql } from "drizzle-orm";
 import path, { dirname } from "path"
 import { fileURLToPath } from 'url'
-import { uploads } from "../dist/src/db/schema.js";
-import { transcodeToHLS } from "../scripts/transcodeToHls.js";
+import { uploads , uploaded_vid } from "../dist/src/db/schema.js";
+import { getVideoDuration, transcodeToHLS } from "../scripts/transcodeToHls.js";
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -16,10 +16,10 @@ const final_dir = path.join(__dirname , '..' ,'videos')
 
 
 router.post('/init' , async(req, res)=> {
-    const {filename , totalChunks} = req.body 
+    const {filename , totalChunks , new_name} = req.body 
     const result = await db
     .insert(uploads)
-    .values({ original_filename : filename , total_chunks : totalChunks})
+    .values({ original_filename : filename , total_chunks : totalChunks  })
     .returning()
 
     const uploadId = result[0].id  
@@ -61,12 +61,19 @@ router.post('/:uploadId/finalize' , async(req, res)=>{
             size : stats.size,
             updated_at : new Date()
         })
-        .where(eq(uploads.id , uploadId))
+         .where(eq(uploads.id , uploadId))
+        const duration = await getVideoDuration(finalPath)
+       const uploaded_result =  await db
+        .insert(uploaded_vid)
+        .values({
+            name : upload.original_filename ,
+            duration : Number(duration), 
+        }).returning()
         fs.rm(dirPath , {recursive : true , force : true} , (err)=>{
             if (err) throw err
 
         })
-        await transcodeToHLS(filename)
+        transcodeToHLS(filename,uploaded_result[0])
         res.json({message : 'upload complete'})
     })
 

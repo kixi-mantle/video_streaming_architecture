@@ -12,3 +12,4 @@ export default  defineConfig({
        url : env.POSTGRES_STRING  
     }
 })
+

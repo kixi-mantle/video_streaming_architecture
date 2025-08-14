@@ -1,4 +1,4 @@
-import { pgTable , uuid , text , integer , timestamp } from "drizzle-orm/pg-core";
+import { pgTable , uuid , text , integer , timestamp, numeric  } from "drizzle-orm/pg-core";
 
 
 const recievetype = ["uploading", "processing", "complete" , "failed"] as const
@@ -14,6 +14,18 @@ export const uploads = pgTable("uploads" , {
   status: text("status", {
     enum: ["uploading", "processing", "complete", "failed"],
   }).default("uploading"),
+
   created_at: timestamp("created_at").defaultNow(),
   updated_at: timestamp("updated_at").defaultNow(),
 })
+
+
+export const uploaded_vid = pgTable("uploaded_vid" , {
+    id : uuid("id").primaryKey().defaultRandom(),
+    name : text().notNull(),
+    status : text("status" , {
+        enum : ["processing", "completed"  , "failed"],
+    }).default("processing"),
+ duration : numeric().notNull()
+})
+
