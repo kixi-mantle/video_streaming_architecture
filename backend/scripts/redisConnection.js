@@ -1,4 +1,3 @@
-
 import { createClient } from 'redis';
 import { env } from '../dist/env_var.js';
 
@@ -12,8 +11,9 @@ const client = createClient({
     }
 });
 
-client.on('error', err => console.log('Redis Client Error', err));
 
 await client.connect();
 
+client.on('error', err => console.log('Redis Client Error', err));
+client.on('connect' , ()=> console.log('redis client connected'))
 export default client

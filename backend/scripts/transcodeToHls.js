@@ -7,6 +7,7 @@ import util  from "util";
 import client from "./redisConnection.js";
 import { db } from "../src/index.js";
 import { uploaded_vid } from "../dist/src/db/schema.js";
+import { warn } from "console";
 
 
 const execPromise = util.promisify(exec);
@@ -53,30 +54,37 @@ export async function transcodeToHLS(uploadId, fileInfo){
                const progressData = {};
                lines.forEach(line => {
                 const [key , val] = line.split('=');
-                   if(key && val) progressData[key.trim()]
+                   if(key && val) progressData[key.trim()] = val.trim()
                });
 
                if(progressData.out_time_ms) {
-                   const outTimeSeconds = parseInt(progressData.out_time_ms, 10)
-                   const progressPercent = Math.min(100 , Math.round(outTimeSeconds / fileInfo.duration) * 100)
+                   const outTimeSeconds = parseInt(progressData.out_time_ms, 10)/1000000
+                const rawPercent = (outTimeSeconds / fileInfo.duration) * 100;
+                const progressPercent = Math.min(100, Math.round(rawPercent));
                    
-                   const now = Date.now();
-                   if(now - lastProgressUpdate > 2000){
-                       lastProgressUpdate = now;
+                   if(progressPercent- lastProgressUpdate > 5){
+                       lastProgressUpdate = progressPercent;
                        await client.set(`video:${fileInfo.id}` , progressPercent)
+                        await client.publish(`video:${fileInfo.id}:updates` , JSON.stringify({
+        videoId: fileInfo.id,
+        progress: progressPercent
+    }))
                    }
                }
-           })
-           process.stderr.on('data' , data=>{
-               console.error('ffmpeg stderr: ', data.toString())
            })
 
            process.on('close' , async(code) =>{
                if(code === 0) {
-                   await client.del(`video:${fileInfo.id}`)
 
-                   await db.update(uploaded_vid).set(uploaded_vid.status , "completed")
+                       await client.set(`video:${fileInfo.id}` , 100)
+                                        
+                        await client.publish(`video:${fileInfo.id}:updates` , JSON.stringify({
+        videoId: fileInfo.id,
+        progress: 100,
+    }))
+                   await db.update(uploaded_vid).set({status : "completed"}).where(eq(uploaded_vid.id , fileInfo.id));
                     
+                 await client.del(`video:${fileInfo.id}`)
                    resolve();
                } else{
                    reject(new Error(`ffmpeg exited with code ${code}`))

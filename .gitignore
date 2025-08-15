@@ -12,3 +12,8 @@
 # Frontend specific (future proofing)
 **/.next/
 **/out/
+
+#videos file
+**/hls/*
+**/videos/*
+**/uploads/*

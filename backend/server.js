@@ -7,51 +7,80 @@ import express from 'express';
 import path from "path";
 import client from "./scripts/redisConnection.js";
 
+
+const app = express();
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
-const app = express();
+
+
+app.use(express.json())
+app.use(express.static(path.join(__dirname ,"..", "frontend")))
+
+app.get('/uploaded_videos', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'frontend', 'uploaded_videos', 'index.html'));
+});
+app.use('/upload' , uploadRoutes)
+app.use('/uploadedvid' ,uploadedRoutes)
+
 const server = createServer(app);
 const ws_s = new WebSocketServer({server});
 
 const subscriptions = new Map();
 
 ws_s.on('connection', async (socket, req) => {
-    const videoId = new URL(req.url, 'http://dummy').searchParams.get('videoId');
-    if (!videoId) return;
+    console.log('connection eastablished')
 
-    let sub = subscriptions.get(videoId);
 
-    if (!sub) {
-        const sockets = new Set();
-        const redisSubscriber = client.duplicate();
-        await redisSubscriber.connect();
-        await redisSubscriber.subscribe(`video:${videoId}`, (message) => {
-            for (const s of sockets) {
-                if (s.readyState === WebSocket.OPEN) {
-                    s.send(message);
+    socket.on('message' , async(rawMessage)=> {
+
+        try {
+            const message = JSON.parse(rawMessage)
+
+            if(message.type === 'subscribe'&& message.videoId){
+                const videoId  = message.videoId;
+
+                let sub = subscriptions.get(videoId);
+
+             if (!sub){
+                    const sockets = new Set();
+                    sockets.add(socket)
+                    
+                    
+                    const redisSubscriber = client.duplicate();
+                     
+
+                    redisSubscriber.on('error', (err) => {
+                        console.error(`Redis subscriber error for ${videoId}:`, err);
+                    });
+
+
+                    await redisSubscriber.connect();
+                    await redisSubscriber.subscribe(`video:${videoId}:updates`, (msg) => {
+
+                        for (const s of sockets) {
+                            if (s.readyState === WebSocket.OPEN) {
+                                s.send(msg);
+                            }
+                        }
+                    });
+
+                    sub = { sockets, redis: redisSubscriber };
+                    subscriptions.set(videoId, sub);
                 }
+
+                sub.sockets.add(socket);
             }
-        });
+        } catch (error) {
 
-        sub = { sockets, redis: redisSubscriber };
-        subscriptions.set(videoId, sub);
-    }
-
-    sub.sockets.add(socket);
+        }
+    })
 
     socket.on('close', async () => {
-        sub.sockets.delete(socket);
-        if (sub.sockets.size === 0) {
-            await sub.redis.unsubscribe(`video:${videoId}`);
-            await sub.redis.quit();
-            subscriptions.delete(videoId);
-        }
     });
 });
 
 
-app.use(express.json())
-app.use(express.static(path.join(__dirname ,"..", "frontend")))
-app.use('/upload' , uploadRoutes)
-app.use('/uploadedvid' ,uploadedRoutes)
-app.listen(3000, () => console.log('Server started on port 3000'));
+
+server.listen(3000, () => {
+    console.log('HTTP and WebSocket server running on port 3000');
+});

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Processing Status</title>
+    <style>
+        .video-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .progress-container {
+            width: 100%;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            margin-top: 10px;
+            overflow: hidden;
+        }
+        .progress-bar {
+            height: 20px;
+            background-color: #4CAF50;
+            text-align: center;
+            line-height: 20px;
+            color: white;
+            width: 0%;
+            transition: width 0.3s ease-out, background-color 0.3s ease;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status {
+            font-weight: bold;
+        }
+        .status.processing {
+            color: #FF9800;
+        }
+        .status.completed {
+            color: #4CAF50;
+        }
+    </style>
+</head>
+<body>
+    <h1>Video Processing Status</h1>
+    <div id="videos-container"></div>
+
+<script>
+    let progressVideos = new Map();
+
+    async function initVideoTracking() {
+        try {
+            const response = await fetch('http://localhost:3000/uploadedvid');
+            const videos = await response.json();
+            
+            videos.data.forEach(video => {
+                if (video.status === 'processing') {
+                    progressVideos.set(video.id, 0);
+                }
+                createVideoCard(video);
+            });
+            
+            if (progressVideos.size > 0) {
+                const socket = new WebSocket('ws://localhost:3000');
+
+                socket.onopen = () => {
+                    for (const videoId of progressVideos.keys()) {
+                        socket.send(JSON.stringify({
+                            type: 'subscribe',
+                            videoId: videoId
+                        }));
+                    }
+                };
+
+                socket.onmessage = (event) => {
+                    const { progress, videoId } = JSON.parse(event.data);
+                    
+                    if (progress === 100) {
+                        const statusElem = document.querySelector(`#video-${videoId} .status`);
+                        progressVideos.delete(videoId);
+                        if (statusElem) {
+                            statusElem.textContent = "Completed ✅";
+                            statusElem.classList.add('completed');
+                            statusElem.classList.remove('processing');
+                        }
+                        updateProgressBar(videoId, 100);
+                    } else {
+                        updateProgressBar(videoId, progress);
+                    }
+                    
+                    if (progressVideos.size === 0) {
+                        socket.close();
+                    }
+                };
+
+                socket.onerror = (error) => {
+                    console.error('WebSocket error:', error);
+                };
+            }
+        } catch (err) {
+            console.error("Error loading videos:", err);
+        }
+    }
+
+function updateProgressBar(videoId, progress) {
+    const videoCard = document.querySelector(`#video-${videoId}`);
+    const progressContainer = videoCard.querySelector('.progress-container');
+    const statusElem = videoCard.querySelector('.status');
+
+    if (progress === 100) {
+        // Remove processing elements and update status
+        if (progressContainer) {
+            progressContainer.remove();
+        }
+        statusElem.textContent = "Completed ✅";
+        statusElem.classList.remove('processing');
+        statusElem.classList.add('completed');
+        
+        // Update the progressVideos map
+        progressVideos.delete(videoId);
+    } else {
+        // Update progress bar
+        const progressBar = videoCard.querySelector('.progress-bar');
+        if (progressBar) {
+            progressBar.style.width = `${progress}%`;
+            progressBar.textContent = `${progress}%`;
+            
+            // Visual feedback based on progress
+            if (progress > 90) {
+                progressBar.style.backgroundColor = '#2E7D32'; // Dark green
+            } else if (progress > 70) {
+                progressBar.style.backgroundColor = '#4CAF50'; // Normal green
+            } else if (progress > 30) {
+                progressBar.style.backgroundColor = '#8BC34A'; // Light green
+            } else {
+                progressBar.style.backgroundColor = '#CDDC39'; // Yellow-green
+            }
+        }
+    }
+}
+
+function createVideoCard(video) {
+    const container = document.getElementById('videos-container');
+    const card = document.createElement('div');
+    card.className = 'video-card';
+    card.id = `video-${video.id}`;
+    
+    // Determine status class and content
+    const statusClass = video.status === 'processing' ? 'processing' : 'completed';
+    const statusText = video.status === 'processing' ? 'processing' : 'Completed ✅';
+    
+    card.innerHTML = `
+        <h3>${video.name}</h3>
+        <div>Status: <span class="status ${statusClass}">${statusText}</span></div>
+        ${video.status === 'processing'
+            ? `<div class="progress-container">
+                <div class="progress-bar">0%</div>
+               </div>`
+            : ''}
+    `;
+    container.appendChild(card);
+}
+    window.addEventListener('load', initVideoTracking);
+</script>
+</body>
+</html>
