@@ -20,6 +20,7 @@ app.get('/uploaded_videos', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'frontend', 'uploaded_videos', 'index.html'));
 });
 app.use('/upload' , uploadRoutes)
+app.use("/hls", express.static(path.join(__dirname , "hls")))
 app.use('/uploadedvid' ,uploadedRoutes)
 
 const server = createServer(app);
